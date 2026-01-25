@@ -342,3 +342,103 @@ Click on the images to see further details.
 
 For issues concerning installing and running Gazebo on your platform please
 consult the Gazebo documentation for [troubleshooting frequent issues](https://gazebosim.org/docs/harmonic/troubleshooting#ubuntu).
+
+
+
+ArduPilot Zephyr SITL Simulation (Gazebo)
+
+This project simulates the Zephyr Delta Wing in Gazebo using ArduPilot SITL.
+
+Note: The Zephyr is a "Belly Lander" (no wheels). Standard runway takeoffs in Gazebo fail because ground friction prevents the plane from reaching takeoff speed. Solution: This simulation uses a "High Altitude Air-Drop" method. The plane spawns at 500m, and the autopilot recovers it in mid-air.
+Prerequisites
+
+    Ubuntu 20.04 or 22.04 (WSL2 or Native)
+
+    ArduPilot: Cloned and built (waf configure --board sitl).
+
+    Gazebo: (Garden or Harmonic) installed.
+
+    ArduPilot-Gazebo Plugin: Installed and paths configured in .bashrc.
+
+1. Configuration
+The World File (worlds/zephyr_runway.sdf)
+
+To survive the connection delay, the plane must spawn high enough to freefall for ~30 seconds. Ensure the <pose> element is set to 500 meters:
+XML
+
+<include>
+  <uri>model://zephyr_with_ardupilot</uri>
+  <pose degrees="true">0 0 500 0 0 180</pose> </include>
+
+2. Launch Instructions
+
+Step 1: Clear "Zombie" Processes Always run this before starting to ensure network ports are free:
+Bash
+
+killall -9 arduplane gz sim_vehicle.py python3
+
+Step 2: Launch Gazebo (Terminal 1) Launch the simulation immediately (no pause):
+Bash
+
+gz sim -v4 -r zephyr_runway.sdf
+
+The plane will begin falling from the sky immediately.
+
+Step 3: Launch ArduPilot (Terminal 2) Run the SITL vehicle script. Do not wait for the plane to hit the ground.
+Bash
+
+~/ardupilot/Tools/autotest/sim_vehicle.py -v ArduPlane -f JSON --add-param-file=Tools/autotest/default_params/gazebo-zephyr.parm --console --map
+
+3. The "Mid-Air Recovery"
+
+Watch the MAVProxy console in Terminal 2.
+
+    Wait for the message: AP: EKF3 active.
+
+    IMMEDIATELY run these commands to wake up the engine:
+
+Bash
+
+mode TAKEOFF
+arm throttle force
+
+    Result: The motor will spin to 100%, the plane will swoop down, level out, and begin circling at the takeoff altitude.
+
+4. Flight Control
+Guided Mode (Point-and-Click)
+
+To tell the drone where to fly:
+
+    mode GUIDED
+
+    Open the Map window.
+
+    Right-Click on a location -> Fly To.
+
+Manual Mode (Fly-By-Wire)
+
+To fly using joystick/keyboard commands via MAVProxy:
+
+    mode FBWA (Fly-By-Wire A - Stabilized).
+
+    Commands:
+
+        rc 3 2000 (Full Throttle)
+
+        rc 2 1200 (Pitch Down)
+
+        rc 2 1900 (Pitch Up)
+
+        rc 1 1200/1900 (Roll Left/Right)
+
+5. Landing (Belly Slide)
+
+Since there are no wheels, we perform a manual glide.
+
+    Align the plane with the ground.
+
+    Cut Power: rc 3 1000
+
+    Dive: rc 2 1200
+
+    Flare: At 10 meters altitude, pull up gently (rc 2 1600) to bleed off speed and slide onto the ground.
